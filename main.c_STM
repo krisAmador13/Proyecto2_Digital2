@@ -358,7 +358,7 @@ void Menu(void){
 
 }
 
-void Seleccion_LEDS(void) {
+void Seleccion_LEDS(void) {//Funcion para recibir datos de led y tiempo de encendido 
     // Limpiar el buffer antes de recibir datos
     memset(led_sel, 0, sizeof(led_sel));
 
