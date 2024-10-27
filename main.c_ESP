@@ -1,0 +1,162 @@
+#include <Arduino.h>
+#include <stdint.h>
+#include "Wire.h"
+#include <ESP32SPISlave.h>
+
+#define POT_1 12  // Pin potenciómetro 1
+#define LED_1 15
+#define LED_2 4
+#define LED_3 2
+#define I2C_DEV_ADDR 0x55
+ESP32SPISlave slave;
+
+//Definimos variables privadas 
+int mapeo = 0;
+char lect='0';
+String tiempo;
+String LED;
+String Tiempo;
+int coma;
+
+int valor = 0;
+uint8_t voltaje = 0;
+int seleccion=0;
+uint8_t pot_valor=0;
+//Variables correspondientes a SPI
+static constexpr uint32_t BUFFER_SIZE{32};
+uint8_t led_spi_slave_rx_buf[BUFFER_SIZE];
+uint8_t spi_slave_tx_buf[BUFFER_SIZE];
+char cadena[11];
+//Definimos prototipos de función 
+void Lect_ADC(void);
+void Seleccion_LEDS();
+void LEDS_seleccion();
+void onRequest();
+void onReceive(int len);
+
+
+
+void setup() {
+  Serial.begin(115200);    
+  Serial.setDebugOutput(true); 
+ 
+  pinMode(POT_1, INPUT);     // Configurar pines como entrada
+  pinMode(LED_1, OUTPUT);
+  pinMode(LED_2, OUTPUT);
+  pinMode(LED_3, OUTPUT);
+  //Comunicación I2C
+  Wire.onReceive(onReceive);
+  Wire.onRequest(onRequest);
+  Wire.begin((uint8_t)I2C_DEV_ADDR);
+  //Comunicación SPI
+  slave.setDataMode(SPI_MODE0);
+  slave.setQueueSize(1);
+  slave.begin(VSPI);
+      //limpiar buffers
+  memset(led_spi_slave_rx_buf,0,BUFFER_SIZE);
+  memset(spi_slave_tx_buf,0,BUFFER_SIZE);
+}
+
+void loop() {
+slave.wait(led_spi_slave_rx_buf, spi_slave_tx_buf, BUFFER_SIZE);
+  
+  // Procesar los datos cuando estén disponibles
+  while (slave.available()) {
+    Serial.print("Comando recibido: ");
+    Serial.println((char*)led_spi_slave_rx_buf);  // Mostrar la cadena completa
+    
+    // Copiar los datos del buffer a la cadena
+    for (int i = 0; i < 10; i++) {
+      cadena[i] = led_spi_slave_rx_buf[i];
+    }
+    cadena[10] = '\0';  // Asegurar que la cadena termine con '\0'
+    Serial.println("Cadena recibida: " + String(cadena));
+
+    // Llamar a la función de selección de LEDs
+    Seleccion_LEDS();
+
+    slave.pop();  // Limpiar el buffer SPI
+    LEDS_seleccion(); 
+  }
+}
+
+
+
+void Seleccion_LEDS(void) {
+  
+// Buscar la coma en la cadena
+String dato= cadena;
+  coma = dato.indexOf(',');
+
+  // Verificar que la coma exista en la cadena
+  if (coma != -1) {
+    // Extraer el número de LED (parte antes de la coma)
+    LED = dato.substring(0, coma);
+    // Extraer el tiempo (parte después de la coma)
+    Tiempo = dato.substring(coma + 1);
+
+    // Convertir los valores de String a entero
+    seleccion = LED.toInt();
+    tiempo = Tiempo;
+
+    // Validar que los datos ingresados sean válidos
+    if ((seleccion >= 1 && seleccion <= 3) && (tiempo.toInt() > 0)) {
+      LEDS_seleccion();  // Encender el LED seleccionado con el tiempo especificado
+    } else {
+      Serial.println("Error: Asegúrese de ingresar un LED válido (1, 2, 3) y un tiempo mayor a 0.");
+    }
+  } else {
+    Serial.println("Formato inválido. Use el formato n,m (Ej: 1,500).");
+  }
+}
+void LEDS_seleccion(void) {
+  Serial.print("Usted ha seleccionado la led:");
+  Serial.print(seleccion);
+  Serial.print("y el tiempo");
+  Serial.print(tiempo);
+  
+  if (seleccion == 1) {
+    digitalWrite(LED_1, HIGH);
+    digitalWrite(LED_2, LOW);
+    digitalWrite(LED_3, LOW);
+    delay(tiempo.toInt());  // Convertir String a int
+    digitalWrite(LED_1, LOW);
+  }
+  else if (seleccion == 2) {
+    digitalWrite(LED_1, LOW);
+    digitalWrite(LED_2, HIGH);
+    digitalWrite(LED_3, LOW);
+    delay(tiempo.toInt());
+    digitalWrite(LED_2, LOW);
+  }
+  else if (seleccion == 3) {
+    digitalWrite(LED_1, LOW);
+    digitalWrite(LED_2, LOW);
+    digitalWrite(LED_3, HIGH);
+    delay(tiempo.toInt());
+    digitalWrite(LED_3, LOW);
+  }
+  else {
+    Serial.println("Error: LED inválido");
+  }
+}
+void onRequest(){
+  Wire.print(pot_valor);
+
+}
+void onReceive(int len ){
+  Serial,printf("onReceive[%d]:",len);
+  while(Wire.available()){
+
+    uint16_t eleccion=Wire.read();
+    Serial.write(eleccion);
+    if(eleccion=='2'){
+      valor = analogRead(POT_1);
+      pot_valor=map(valor,0,4095,0,255);
+      Serial.print("El voltaje es: ");
+      Serial.print(pot_valor);
+      Serial.println(" V");
+      delay(1000);
+    }
+  }
+}
