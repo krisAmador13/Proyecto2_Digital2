@@ -23,7 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include <string.h>   // Para manejo de cadenas
 #include <stdlib.h>   // Para convertir cadenas a enteros
-#include <stdio.h>
+#include <stdio.h> // Imprimir texto en la consola.
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,15 +49,16 @@ SPI_HandleTypeDef hspi1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+//Variables para impresión de datos en el monitor 
 char sensor[2];
 char opcion[64];
 char opcion2[64];
 char seleccion;
 char sel[100];
-int mostrarMenu = 0;
-uint8_t TX_Buffer[] = "0";
-uint8_t RX_Buffer[3];
+
+int mostrarMenu = 0;//Bandera
+uint8_t TX_Buffer[] = "0";//Buffer de transmisión I2C
+uint8_t RX_Buffer[3];//Buffer de recepción I2C
 char led_sel[10];       // Buffer para recibir la cadena completa (n,m)
 char LED[2];            // Almacena el número del LED (1 dígito)
 char Tiempo[5];         // Almacena el tiempo (hasta 4 dígitos)
@@ -135,26 +136,26 @@ int main(void)
 		  HAL_Delay(3000);
 		  mostrarMenu=1;
 	  }
-	  if(seleccion=='1'){
-		  HAL_GPIO_WritePin(ESP32_CS_GPIO_Port,ESP32_CS_Pin,GPIO_PIN_RESET);
-		  Seleccion_LEDS();
+	  if(seleccion=='1'){//Parte encargada de la comunicación SPI(control de LEDS)
+		  HAL_GPIO_WritePin(ESP32_CS_GPIO_Port,ESP32_CS_Pin,GPIO_PIN_RESET);//inicialización de pin cs
+		  Seleccion_LEDS();//Función de recepción de comandos para control 
 		  HAL_Delay(50);
-		  HAL_GPIO_WritePin(ESP32_CS_GPIO_Port,ESP32_CS_Pin,GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(ESP32_CS_GPIO_Port,ESP32_CS_Pin,GPIO_PIN_SET);//apagar pin 
 		  mostrarMenu=0;
 		  seleccion='0';
 
 
 	  }
-	  if(seleccion=='2'){
+	  if(seleccion=='2'){//Parte encargada de comunicación I2C (Recepción de datos ADC)
 		  TX_Buffer[0]='0';
 		  sprintf(sel, "La medicion del sensor es:\n");
 		  HAL_UART_Transmit(&huart2, (uint8_t*)sel, strlen(sel), HAL_MAX_DELAY);
-		  HAL_I2C_Master_Transmit(&hi2c1,(deviceAddress<<1)|0x00,TX_Buffer,2,HAL_MAX_DELAY);
+		  HAL_I2C_Master_Transmit(&hi2c1,(deviceAddress<<1)|0x00,TX_Buffer,2,HAL_MAX_DELAY);//Se inicia com I2C
 		  TX_Buffer[0]='2';
-		  HAL_I2C_Master_Transmit(&hi2c1,(deviceAddress<<1)|0x00,TX_Buffer,2,HAL_MAX_DELAY);
+		  HAL_I2C_Master_Transmit(&hi2c1,(deviceAddress<<1)|0x00,TX_Buffer,2,HAL_MAX_DELAY);//transmición de comando I2C a esclavo
 		  HAL_Delay(100);
-		  HAL_I2C_Master_Receive(&hi2c1,(deviceAddress<<1)|0x03,(uint8_t*)RX_Buffer,3,HAL_MAX_DELAY);
-		  HAL_UART_Transmit(&huart2,RX_Buffer,sizeof(RX_Buffer),100);
+		  HAL_I2C_Master_Receive(&hi2c1,(deviceAddress<<1)|0x03,(uint8_t*)RX_Buffer,3,HAL_MAX_DELAY);//Recepción de Datos I2C
+		  HAL_UART_Transmit(&huart2,RX_Buffer,sizeof(RX_Buffer),100);//Mostrar datos recibidos en la terminal serial
 		  HAL_Delay(500);
 		  mostrarMenu=0;
 		  seleccion='0';
@@ -348,9 +349,9 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void Menu(void){
+void Menu(void){//Se le indica al ususrio que puede hacer y se le solicita escoger una opción 
 	sprintf(opcion, "¿Controlar dispositivo SPI\n");
-    HAL_UART_Transmit(&huart2, (uint8_t*)opcion, strlen(opcion), HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart2, (uint8_t*)opcion, strlen(opcion), HAL_MAX_DELAY);//inicio de comunicación UART
 	sprintf(opcion2, "¿Obtener medición de Sensor I2C\n");
 	HAL_UART_Transmit(&huart2, (uint8_t*)opcion2, strlen(opcion2), HAL_MAX_DELAY);
 	HAL_Delay(2000);
@@ -358,7 +359,7 @@ void Menu(void){
 
 }
 
-void Seleccion_LEDS(void) {//Funcion para recibir datos de led y tiempo de encendido 
+void Seleccion_LEDS(void) {
     // Limpiar el buffer antes de recibir datos
     memset(led_sel, 0, sizeof(led_sel));
 
